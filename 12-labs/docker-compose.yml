@@ -1,0 +1,88 @@
+# Лаборатория для подготовки к собеседованию в команду биллинга Профи.ру.
+# Поднимает MySQL 8, Redis 7, RabbitMQ 3.13 (management UI) и PHP 8.3 CLI
+# с расширениями pdo_mysql / bcmath.
+#
+#   docker compose up -d
+#   docker compose exec -T mysql mysql -uroot -pbilling billing < sql/01-schema.sql
+#   docker compose exec -T mysql mysql -uroot -pbilling billing < sql/02-seed.sql
+#
+# Пароли здесь специально простые: это локальная песочница на время подготовки, не прод.
+# НЕ используйте этот compose нигде, кроме локальной машины.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: billing-mysql
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_0900_ai_ci
+      --default-authentication-plugin=mysql_native_password
+      --transaction-isolation=REPEATABLE-READ
+      --innodb-print-all-deadlocks=ON
+      --innodb-lock-wait-timeout=10
+      --innodb-buffer-pool-size=512M
+      --slow-query-log=ON
+      --long-query-time=0.5
+    environment:
+      MYSQL_ROOT_PASSWORD: billing
+      MYSQL_DATABASE: billing
+    ports:
+      - "3306:3306"
+    volumes:
+      - billing-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pbilling"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: billing-redis
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --save ""
+    ports:
+      - "6379:6379"
+    volumes:
+      - billing-redis:/data
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: billing-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # management UI → http://localhost:15672
+    volumes:
+      - billing-rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  php:
+    image: php:8.3-cli-alpine
+    container_name: billing-php
+    working_dir: /app
+    # Ставим расширения: pdo_mysql (БД) и bcmath (точная арифметика денег).
+    # Устанавливается один раз при старте контейнера (~20-30 секунд).
+    command: >
+      sh -c "docker-php-ext-install -j4 pdo_mysql bcmath >/dev/null 2>&1 || true;
+             tail -f /dev/null"
+    volumes:
+      - ./:/app
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  billing-mysql:
+  billing-redis:
+  billing-rabbitmq:
