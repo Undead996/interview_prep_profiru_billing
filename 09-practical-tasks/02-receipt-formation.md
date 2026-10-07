@@ -123,7 +123,7 @@ sequenceDiagram
     participant PRV as Провайдер/ОФД
 
     PUB->>F: receipt.requested {operation_id, payment_id, service, amount, snapshot}
-    F->>DB: BEGIN; INSERT receipt(operation_id UNIQUE, status='requested'); COMMIT
+    F->>DB: "BEGIN, INSERT receipt(operation_id UNIQUE, status='requested'), COMMIT"
     Note over F,DB: дубль по operation_id → ничего не делаем (защита от двойного чека)
     F->>PRV: registerReceipt(operation_id=<наш ключ>, fiscal data ...)
     alt успех
@@ -136,7 +136,7 @@ sequenceDiagram
     else постоянная ошибка (неверные теги/сумма)
         PRV-->>F: отказ
         F->>DB: UPDATE receipt SET status='rejected', last_error=...
-        F->>F: DLQ + алерт; решение о чеке коррекции — с бухгалтерией
+        F->>F: "DLQ + алерт, решение о чеке коррекции — с бухгалтерией"
     end
 ```
 

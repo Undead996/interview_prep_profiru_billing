@@ -82,19 +82,19 @@ sequenceDiagram
     participant PUB as Outbox publisher
     participant F as Fiscal
 
-    PSP->>API: POST /webhook (подпись, event_id, payment_id, amount, status)
-    API->>API: 1) проверить подпись (до БД!)
-    API->>DB: 2) BEGIN
-    API->>DB: 3) INSERT processed_event(source,event_id) UNIQUE → дубль? выйти
-    API->>DB: 4) SELECT payment FOR UPDATE
-    API->>API: 5) сверить сумму/валюту; сверить provider_payment_id
-    API->>API: 6) проверить допустимость перехода (машина состояний)
-    API->>DB: 7) UPDATE payment SET status='paid', paid_at=NOW(6) → READ COMMITTED + условие
-    API->>DB: 8) INSERT ledger_entry (Дт транзит ПС / Кт авансы или выручка)
-    API->>DB: 9) INSERT outbox (receipt.requested / payment.settled)
-    API->>DB: 10) COMMIT
-    API-->>PSP: 200 OK
-    PUB->>DB: читает outbox (SKIP LOCKED)
+    PSP->>API: "POST /webhook (подпись, event_id, payment_id, amount, status)"
+    API->>API: "1) проверить подпись (до БД!)"
+    API->>DB: "2) BEGIN"
+    API->>DB: "3) INSERT processed_event(source,event_id) UNIQUE → дубль? выйти"
+    API->>DB: "4) SELECT payment FOR UPDATE"
+    API->>API: "5) сверить сумму/валюту, сверить provider_payment_id"
+    API->>API: "6) проверить допустимость перехода (машина состояний)"
+    API->>DB: "7) UPDATE payment SET status='paid', paid_at=NOW(6) → READ COMMITTED + условие"
+    API->>DB: "8) INSERT ledger_entry (Дт транзит ПС / Кт авансы или выручка)"
+    API->>DB: "9) INSERT outbox (receipt.requested / payment.settled)"
+    API->>DB: "10) COMMIT"
+    API-->>PSP: "200 OK"
+    PUB->>DB: "читает outbox (SKIP LOCKED)"
     PUB->>F: receipt.requested
 ```
 
